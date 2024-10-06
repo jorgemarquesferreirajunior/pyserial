@@ -225,7 +225,7 @@ class ArduinoGUISerial(QWidget):
         data = self.te_translate_text.toPlainText()[:51].lower()
         if len(data) == 0:
             data = " "
-        len_data = str(len(data))
+        len_data = str(len(data)).zfill(2)
 
         message = address + func + len_data + data
 
@@ -235,10 +235,12 @@ class ArduinoGUISerial(QWidget):
         message += str(crc16_val) + "\n"
 
         self.my_serial.send_frame(frame=message.encode())
-        sleep(0.2)
+        # sleep(0.2)
         self.te_translate_text.clear()
 
         response = self.my_serial.response_frame()
+        if not response:
+            response = ["ERROR"]
 
         print(f"crc calculated: {crc16_val} : {hex(crc16_val)}")
         print(f"Frame sent: {message}")
@@ -293,12 +295,13 @@ class MySerial:
         )
 
     def send_frame(self, frame):
-        self.serial.reset_input_buffer()
-        self.serial.reset_output_buffer()
+        # self.serial.reset_input_buffer()
+        # self.serial.reset_output_buffer()
 
         self.serial.write(frame)
 
     def response_frame(self):
+        self.serial.timeout = 1
         response = self.serial.read_until(b"\n")
 
         while self.serial.in_waiting > 0:
