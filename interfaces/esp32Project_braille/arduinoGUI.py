@@ -315,19 +315,5 @@ class MySerial:
 if __name__ == "__main__":
     app = QApplication([])
     win = ArduinoGUISerial()
-    # crc16 = mkPredefinedCrcFun("xmodem")
-
-    # data = [0x01, 0xFF, 0xE4, 0xF4, 0x12, 0x34, 0x56, 0x12]
-
-    # Calculate CRC-16 XModem
-    # crc_xmodem = compute_crc_xmodem(data)
-    # print(f"CRC-16 XModem = 0x{crc_xmodem:04X}")
-
-    # crc16_xmodem = crcmod.predefined.Crc("xmodem")
-    # crc16_xmodem.update(bytes(data))
-
-    # crc_value = crc16_xmodem.crcValue
-    # print(f"Python CRC16: {hex(crc_value).upper()}")
-
     win.show()
     app.exec()
