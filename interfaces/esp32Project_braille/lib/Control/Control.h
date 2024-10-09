@@ -8,7 +8,7 @@ void reset_output(void) {
   }
 }
 
-void define_caractere(int caractere) {
+void define_caractere(char caractere) {
   switch (caractere) {
   case 97: // a
     output[0] = 1;
@@ -176,8 +176,8 @@ void define_caractere(int caractere) {
     for (int i = 0; i < 6; i++) { // inicia o array com 0
       output[i] = 0;
 
-      break;
     }
+    break;
   }
 }
 

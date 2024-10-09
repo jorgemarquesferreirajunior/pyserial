@@ -40,7 +40,9 @@ unsigned short data_length;                                 // Tamanho da mensag
 unsigned int crc_received;                                  // Crc recebido
 bool enable_program;                                        // Flag para controle de fluxo
 bool crc_check;                                             // Flag para verificacao do crc
-bool trigger_program = false;                               // Flag para travamento de execucao de programa
+bool trigger_program =            false;                    // Flag para travamento de execucao de programa
+bool translation_ok =             false;                    // Flag para controle da traducao
+long time_slap =                  500;                      // Tempo de intervalo entre cada troca de caractere             
 /*
  * Declaracao escope de funcoes auxiliares
  */
@@ -49,13 +51,17 @@ void comunication_mode(String mode);                        // Funcao para contr
 void setPinout(void);                                       // Funcao para configuracao do pinMode
 void execute_program(void);                                 // Funcao para ececucao das tarefas do Dispositivo
 void clearBuffer(void);                                     // Funcao para limar o buffer de entrada do Dispositivo                                                           
-void exibe_caractere(unsigned short pins[6]);
+void exibe_caractere(void);
+void compile_translation(void);
+void execute_translation(void);
+void change_speed(void);
+void obtain_speed(void);
 
 void setup() {
   Serial.begin(9600);                                       // Velocidade de comunicacao
   setPinout();                                              // configuracao do pinMode 
-  //reset_output();                                           // Zera o buffer para controle dos pontos
-  //exibe_caractere(pins);                                    // Set de todos pontos abaixados
+  reset_output();                                           // Zera o buffer para controle dos pontos
+  exibe_caractere();                                    // Set de todos pontos abaixados
   comunication_mode("RECEIVE");                             // Habilita a recepcao de dados da interface 
 }
 
@@ -126,51 +132,21 @@ void execute_program(void){
 
       switch (function_received.charAt(0)) {
         case CODE_TRANSLATE_MESSAGE:
-          comunication_mode("SEND");
-          /* 
-          if (data_length > 0 and data_received[0] != ' ') {
-            Serial.print("Data[0](int): ");
-            Serial.print(data_received[0], HEX);
+          compile_translation(); 
+          break;
 
-          }
-          */
-          Serial.println("LED ON");
-          delay(200);
-          comunication_mode("RECEIVE");
-          digitalWrite(_LED, HIGH);
-          break;
         case CODE_EXECUTE_MESSAGE:
-          comunication_mode("SEND");
-          Serial.println("LED OFF");
-          delay(200);
-          comunication_mode("RECEIVE");
-          digitalWrite(_LED, LOW);
+          execute_translation(); 
           break;
+
         case CODE_CHANGE_SPEED:
-          comunication_mode("SEND");
-          Serial.println("LED BLINKING");
-          delay(200);
-          comunication_mode("RECEIVE");
-          digitalWrite(_LED, LOW);
-          delay(1000);
-          for (size_t i = 0; i < 6; i++) {
-            digitalWrite(_LED, !digitalRead(_LED));
-            delay(500);
-          }
-          
+          change_speed(); 
           break;
+
         case CODE_CURRENT_SPEED:
-          comunication_mode("SEND");
-          Serial.println("LED FAST");
-          delay(200);
-          comunication_mode("RECEIVE");
-          digitalWrite(_LED, LOW);
-          delay(1000);
-          for (size_t i = 0; i < 6; i++) {
-            digitalWrite(_LED, !digitalRead(_LED));
-            delay(250);
-          }
+          obtain_speed(); 
           break;
+
         default:
           break;
       }
@@ -191,8 +167,80 @@ void clearBuffer(void){
   }
 }
 
-void exibe_caractere(unsigned short pins[6]) {
-  for (size_t i = i; i < 6; i++) {
-    digitalWrite(pins[i], output[i]);
+void exibe_caractere(void) {
+  
+  digitalWrite(POINT_1, output[0]);
+  digitalWrite(POINT_2, output[1]);
+  digitalWrite(POINT_3, output[2]);
+  digitalWrite(POINT_4, output[3]);
+  digitalWrite(POINT_5, output[4]);
+  digitalWrite(POINT_6, output[5]);
+}
+
+
+void compile_translation(void) {
+  if (data_length > 0) {
+    comunication_mode("SEND");
+    Serial.print("Executing translation...");
+    delay(200);
+    comunication_mode("RECEIVE");
+    for (size_t i = 0; i < data_length; i++) {
+      define_caractere(data_received[i]);
+    }
+    digitalWrite(_LED, HIGH);
+    translation_ok = true;
   }
+  else {
+    comunication_mode("SEND");
+    Serial.println("No message found to translation...");
+    delay(200);
+    comunication_mode("RECEIVE");
+    digitalWrite(_LED, LOW);
+  }
+}
+void execute_translation(void) {
+  comunication_mode("SEND");
+  Serial.println("Executing program :)");
+  delay(200);
+  comunication_mode("RECEIVE");
+  reset_output();
+  exibe_caractere();
+  for (size_t i = 0; i < data_length; i++) {
+    define_caractere(data_received[i]);
+    exibe_caractere();
+    digitalWrite(_LED, HIGH);
+    delay(time_slap);
+    reset_output();
+    exibe_caractere();
+    digitalWrite(_LED, LOW);
+    delay(time_slap);
+  }
+  reset_output();
+  exibe_caractere();
+  digitalWrite(_LED, LOW);
+  translation_ok = false;
+}
+
+void change_speed(void) {
+  comunication_mode("SEND");
+  Serial.print("Change speed ... ");
+  Serial.print(time_slap);
+  Serial.print(" -->> ");
+  Serial.println(data_received);
+  delay(200);
+  comunication_mode("RECEIVE");
+  time_slap = data_received.toInt();
+  delay(1000);
+  for (size_t i = 0; i < 6; i++) {
+    digitalWrite(_LED, !digitalRead(_LED));
+    delay(500);
+  }
+}
+
+void obtain_speed(void) {
+  comunication_mode("SEND");
+  Serial.print("Getting current speed: ");
+  Serial.println(time_slap);
+  delay(200);
+  comunication_mode("RECEIVE");
 }
