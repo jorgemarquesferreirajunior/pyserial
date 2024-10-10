@@ -215,21 +215,6 @@ blue = [255, 0, 0]
 
 
 def get_limits(color_name):
-    color_limits = {
-        "yellow": ([20, 100, 100], [30, 255, 255]),
-        "blue": ([100, 100, 100], [140, 255, 255]),
-        "green": ([40, 100, 100], [80, 255, 255]),
-        "red1": ([0, 100, 100], [10, 255, 255]),
-        "red2": ([170, 100, 100], [180, 255, 255]),
-        "orange": ([10, 100, 100], [20, 255, 255]),
-        "purple": ([140, 100, 100], [160, 255, 255]),
-        "pink": ([160, 100, 100], [180, 255, 255]),
-        "cyan": ([80, 100, 100], [100, 255, 255]),
-        "black": ([0, 0, 0], [180, 255, 30]),
-        "white": ([0, 0, 200], [180, 20, 255]),
-        "gray": ([0, 0, 50], [180, 25, 200]),
-    }
-
     hsv_limits = {
         "yellow": ([20, 100, 100], [30, 255, 255]),
         "blue": ([100, 100, 100], [140, 255, 255]),
@@ -245,7 +230,7 @@ def get_limits(color_name):
         "gray": ([0, 0, 50], [180, 25, 200]),
     }
 
-    return color_limits[color_name]
+    return hsv_limits[color_name]
 
 
 class VideoWorker(QThread):
@@ -280,7 +265,9 @@ class VideoWorker(QThread):
                 hsv_img = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
                 # Deteccao objetos amarelos
-                lower_yellow, upper_yellow = get_limits("yellow")
+               """
+                
+               lower_yellow, upper_yellow = get_limits("yellow")
                 mask_yellow = cv2.inRange(
                     hsv_img, np.array(lower_yellow), np.array(upper_yellow)
                 )
@@ -311,6 +298,8 @@ class VideoWorker(QThread):
                 if bbox_red is not None:
                     x1, y1, x2, y2 = bbox_red
                     cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 5)
+
+               """ 
 
                 # Update detection display
                 image_detection = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)

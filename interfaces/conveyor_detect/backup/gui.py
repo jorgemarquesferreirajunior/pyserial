@@ -1,29 +1,51 @@
 import cv2
-import util
 import numpy as np
-import threading
 import time
 from PIL import Image
 
 cap = cv2.VideoCapture(0)
-yellow = [0, 255, 255]  # formato BGR
+
+# Cores no formato BGR
+yellow = [0, 255, 255]
 blue = [255, 0, 0]
 red = [0, 0, 255]
-rect_size = 50
-avg_rgb = np.array([])
 
 
-def mostra_rgb():
-    while True:
-        if avg_rgb.size > 0:
-            print(f"Valor médio RGB na área central: {avg_rgb}")
-            print(f"Lower limit: {lower_limit}, Upper limit: {upper_limit}")
-        time.sleep(1)
+def get_limits(color, color_name):
+    color_limits = {
+        "yellow": ([20, 100, 100], [30, 255, 255]),
+        "blue": ([100, 100, 100], [140, 255, 255]),
+        "green": ([40, 100, 100], [80, 255, 255]),
+        "red1": ([0, 100, 100], [10, 255, 255]),
+        "red2": ([170, 100, 100], [180, 255, 255]),
+        "orange": ([10, 100, 100], [20, 255, 255]),
+        "purple": ([140, 100, 100], [160, 255, 255]),
+        "pink": ([160, 100, 100], [180, 255, 255]),
+        "cyan": ([80, 100, 100], [100, 255, 255]),
+        "black": ([0, 0, 0], [180, 255, 30]),
+        "white": ([0, 0, 200], [180, 20, 255]),
+        "gray": ([0, 0, 50], [180, 25, 200]),
+    }
 
+    c = np.uint8([[color]])
+    hsvC = cv2.cvtColor(c, cv2.COLOR_BGR2HSV)
 
-thr_mostra_rgb = threading.Thread(target=mostra_rgb)
-thr_mostra_rgb.daemon = True
-thr_mostra_rgb.start()
+    lower_limit = (
+        hsvC[0][0][0] - color_limits[color_name][0][0],
+        color_limits[color_name][0][1],
+        color_limits[color_name][0][2],
+    )
+    upper_limit = (
+        hsvC[0][0][0] - color_limits[color_name][1][0],
+        color_limits[color_name][1][1],
+        color_limits[color_name][1][2],
+    )
+
+    lower_limit = np.array(lower_limit, dtype=np.uint8)
+    upper_limit = np.array(upper_limit, dtype=np.uint8)
+
+    return lower_limit, upper_limit
+
 
 while True:
     ret, frame = cap.read()
@@ -31,57 +53,26 @@ while True:
     if ret:
         hsv_img = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
-        lower_limit, upper_limit = util.get_limits(color=yellow)
+        # Deteccao objetos amarelos
+        lower_yellow, upper_yellow = get_limits(color=yellow, color_name="yellow")
+        mask_yellow = cv2.inRange(hsv_img, lower_yellow, upper_yellow)
+        _mask_yellow = Image.fromarray(mask_yellow)
+        bbox_yellow = _mask_yellow.getbbox()
 
-        mask = cv2.inRange(hsv_img, lower_limit, upper_limit)
-
-        _mask = Image.fromarray(mask)
-
-        bbox = _mask.getbbox()
-
-        if bbox is not None:
-            x1, y1, x2, y2 = bbox
-
-            frame = cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 5)
-
-        """ lower_limits, upper_limits = util.get_limits_red()
-
-        # Criar máscaras para cada intervalo de vermelho
-        mask1 = cv2.inRange(hsv_img, lower_limits[0], upper_limits[0])
-        mask2 = cv2.inRange(hsv_img, lower_limits[1], upper_limits[1])
-
-        mask = cv2.bitwise_or(mask1, mask2) """
+        # Deteccao objetos azuis
+        lower_blue, upper_blue = get_limits(color=blue, color_name="blue")
+        mask_blue = cv2.inRange(hsv_img, lower_blue, upper_blue)
+        _mask_blue = Image.fromarray(mask_blue)
+        bbox_blue = _mask_blue.getbbox()
 
         cv2.imshow("frame", cv2.flip(frame, 1))
-        # cv2.imshow("hsv", cv2.flip(hsv_img, 1))
-        cv2.imshow("mask", cv2.flip(mask, 1))
 
-        # Pegando o ponto central da imagem para exibir o valor RGB
-        height, width, _ = frame.shape
-        center_x, center_y = width // 2, height // 2  # Centro da imagem
-
-        # Definir as coordenadas do retângulo ao redor do ponto central
-        top_left_x = center_x - rect_size // 2
-        top_left_y = center_y - rect_size // 2
-        bottom_right_x = center_x + rect_size // 2
-        bottom_right_y = center_y + rect_size // 2
-
-        # Desenhar o retângulo verde ao redor do ponto central
-        cv2.rectangle(
-            frame,
-            (top_left_x, top_left_y),
-            (bottom_right_x, bottom_right_y),
-            (0, 255, 0),
-            2,
-        )
-
-        # Calcular a média de RGB na região do retângulo
-        region = frame[top_left_y:bottom_right_y, top_left_x:bottom_right_x]
-        avg_bgr = np.mean(region, axis=(0, 1)).astype(int)  # Média BGR na região
-
-        # Exibir o valor RGB (convertido de BGR)
-        avg_rgb = avg_bgr[::-1]  # Inverte para RGB
-        # print(f"Valor médio RGB na área central: {avg_rgb}")
+        if bbox_yellow is not None:
+            x1, y1, x2, y2 = bbox_yellow
+            frame = cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 5)
+        if bbox_blue is not None:
+            x1, y1, x2, y2 = bbox_blue
+            frame = cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 5)
 
         # Mostrar o frame com o retângulo desenhado
         cv2.imshow("frame_with_rectangle", cv2.flip(frame, 1))
