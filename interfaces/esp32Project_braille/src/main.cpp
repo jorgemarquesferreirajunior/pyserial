@@ -1,21 +1,22 @@
-#include <Arduino.h>                                        // Biblioteca padrao para uso do arduino na IDE PLatformIO
-#include "Crc16.h"                                          // Bibliteca para calculo de CRC16
-#include "Control.h"                                        // Bibliteca para controle dos acionamentos dos pontos 
-#define ADDRESS                   1                         // Endereco padrao para comunicacao Interface/Dispositivo
-#define _LED                      2                         // Led indicador do Dispositivo 
+#include <Arduino.h>                                        // Biblioteca padrão para uso do Arduino na IDE PlatformIO
+#include "Crc16.h"                                          // Biblioteca para cálculo de CRC16
+#include "Control.h"                                        // Biblioteca para controle dos acionamentos dos pontos 
+
+#define ADDRESS                   1                         // Endereço padrão para comunicação Interface/Dispositivo
+#define _LED                      2                         // LED indicador do dispositivo
 Crc16 crc;                                                  // Instância da classe CRC16
 
-/*                                                            
+/*
  * Mapeamento de Hardware
-*/
+ */
 
-#define SR_COM                    5                         // Pino de controle envio/recepcao de dados
-#define POINT_1                   13                        // Pino acionamento ponto 1 (led 1)
-#define POINT_2                   12                        // Pino acionamento ponto 2 (led 2)
-#define POINT_3                   14                        // Pino acionamento ponto 3 (led 3)
-#define POINT_4                   27                        // Pino acionamento ponto 4 (led 4)
-#define POINT_5                   26                        // Pino acionamento ponto 5 (led 5)
-#define POINT_6                   25                        // Pino acionamento ponto 6 (led 6)
+#define SR_COM                    5                         // Pino de controle de envio/recepção de dados
+#define POINT_1                   13                        // Pino para acionamento do ponto 1 (LED 1)
+#define POINT_2                   12                        // Pino para acionamento do ponto 2 (LED 2)
+#define POINT_3                   14                        // Pino para acionamento do ponto 3 (LED 3)
+#define POINT_4                   27                        // Pino para acionamento do ponto 4 (LED 4)
+#define POINT_5                   26                        // Pino para acionamento do ponto 5 (LED 5)
+#define POINT_6                   25                        // Pino para acionamento do ponto 6 (LED 6)
 unsigned short pins[6] = {
   POINT_1,
   POINT_2,
@@ -23,152 +24,149 @@ unsigned short pins[6] = {
   POINT_4,
   POINT_5,
   POINT_6
-};                                                          // Lista para coontrole dos pontos
+};                                                          // Lista para controle dos pontos
 
 /*
- * Mapeamento de software/comunicacao rs 485
-*/
-#define CODE_TRANSLATE_MESSAGE    'T'                       // Codigo ASCII para traduzir a mensagem recebida 
-#define CODE_EXECUTE_MESSAGE      'E'                       // Codigo ASCII para executar a mensagem recebida 
-#define CODE_CHANGE_SPEED         'C'                       // Codigo ASCII para alterar a velocidade de execucao da mensagem
-#define CODE_CURRENT_SPEED        'G'                       // Codigo ASCII para obter a velocidade atual de execucao da mensagem
-//String frame_received;                                      // Quadro recebido
-String address_received;                                    // Endereco recebido
-String function_received;                                   // Funcao recebida
-String data_received;                                       // Mensagem recebida
-unsigned short data_length;                                 // Tamanho da mensage recebida
-unsigned int crc_received;                                  // Crc recebido
-bool enable_program;                                        // Flag para controle de fluxo
-bool crc_check;                                             // Flag para verificacao do crc
-bool trigger_program =            false;                    // Flag para travamento de execucao de programa
-bool translation_ok =             false;                    // Flag para controle da traducao
-long time_slap =                  500;                      // Tempo de intervalo entre cada troca de caractere             
-/*
- * Declaracao escope de funcoes auxiliares
+ * Mapeamento de software/comunicação RS485
  */
-void checkSerial(void);                                     // Funcao para checar o recebimento de dados
-void comunication_mode(String mode);                        // Funcao para controle envio/recepcao de dados
-void setPinout(void);                                       // Funcao para configuracao do pinMode
-void execute_program(void);                                 // Funcao para ececucao das tarefas do Dispositivo
-void clearBuffer(void);                                     // Funcao para limar o buffer de entrada do Dispositivo                                                           
-void exibe_caractere(void);
-void compile_translation(void);
-void execute_translation(void);
-void change_speed(void);
-void obtain_speed(void);
+#define CODE_TRANSLATE_MESSAGE    'T'                       // Código ASCII para traduzir a mensagem recebida
+#define CODE_EXECUTE_MESSAGE      'E'                       // Código ASCII para executar a mensagem recebida 
+#define CODE_CHANGE_SPEED         'C'                       // Código ASCII para alterar a velocidade de execução da mensagem
+#define CODE_CURRENT_SPEED        'G'                       // Código ASCII para obter a velocidade atual
+#define CODE_CURRENT_MESSAGE      'M'                       // Código ASCII para obter a mensagem traduzida
+
+String address_received;                                    // Armazena o endereço recebido
+String function_received;                                   // Armazena a função recebida
+String data_received;                                       // Armazena os dados recebidos
+String data_backup = "ola";                                 // Cópia da mensagem recebida
+unsigned short data_length;                                 // Comprimento da mensagem recebida
+unsigned int crc_received;                                  // Valor do CRC recebido
+bool enable_program;                                        // Flag para controle de fluxo do programa
+bool crc_check;                                             // Flag para verificar o CRC
+bool trigger_program =            false;                    // Flag para controle da execução do programa
+bool translation_ok =             false;                    // Flag que indica se a tradução foi bem-sucedida
+long time_slap =                  500;                      // Intervalo entre caracteres durante a exibição
+
+/*
+ * Declaração de escopo das funções auxiliares
+ */
+void checkSerial(void);                                     // Função para checar recebimento de dados pela serial
+void comunication_mode(String mode);                        // Função para alternar entre modos de comunicação
+void setPinout(void);                                       // Função para configurar os pinos de saída
+void execute_program(void);                                 // Função para executar as tarefas do dispositivo
+void clearBuffer(void);                                     // Função para limpar o buffer de entrada serial
+void exibe_caractere(void);                                 // Exibe um caractere em Braille
+void compile_translation(void);                             // Compila a tradução dos dados recebidos
+void execute_translation(void);                             // Executa a tradução já compilada
+void change_speed(void);                                    // Altera a velocidade da execução
+void obtain_speed(void);                                    // Obtém a velocidade atual
+void obtain_message(void);                                  // Obtém a mensagem traduzida atual
 
 void setup() {
-  Serial.begin(9600);                                       // Velocidade de comunicacao
-  setPinout();                                              // configuracao do pinMode 
-  reset_output();                                           // Zera o buffer para controle dos pontos
-  exibe_caractere();                                    // Set de todos pontos abaixados
-  comunication_mode("RECEIVE");                             // Habilita a recepcao de dados da interface 
+  Serial.begin(9600);                                       // Inicializa a comunicação serial com baudrate 9600
+  setPinout();                                              // Configura os pinos como saídas
+  reset_output();                                           // Reseta o estado dos pinos
+  exibe_caractere();                                        // Inicializa os pinos em estado baixo (nenhum ponto ativado)
+  comunication_mode("RECEIVE");                             // Habilita a recepção de dados da interface
 }
 
 void loop() {
-  comunication_mode("RECEIVE");                             // Habilita a recepcao de dados da interface 
-  checkSerial();
-  //delay(200);
-  execute_program();
-  //delay(200);
+  comunication_mode("RECEIVE");                             // Habilita a recepção de dados continuamente
+  checkSerial();                                            // Verifica se dados foram recebidos
+  execute_program();                                        // Executa o programa se os dados forem válidos
 }
 
-/* FUNCOES AUXILIARES*/
+/* FUNÇÕES AUXILIARES */
 
-void checkSerial(void){
-  if (Serial.available()) {
-    String frame_received = Serial.readStringUntil('\n');          // Obtem o quadro de dados recebido
+void checkSerial(void) {
+  if (Serial.available()) {                                 // Se houver dados disponíveis na serial
+    String frame_received = Serial.readStringUntil('\n');    // Lê o quadro de dados até encontrar uma nova linha
 
-    if (frame_received.length() > 0) {
-      // Separar o frame nas suas partes
-      address_received = frame_received.substring(0, 1);    // Endereço
-      function_received = frame_received.substring(1, 2);   // Funcao
-      String lengthOfData = frame_received.substring(2, 4); // Comprimento dos dados
-      data_length = lengthOfData.toInt();                   // Converte comprimento para inteiro
-      data_received = frame_received.substring(4, 4 + data_length);                                     // Pega os dados
-      String crcReceived = frame_received.substring(4 + data_length);                                   // CRC recebido como string
-      crc_received = crcReceived.toInt();                   // Converte o CRC recebido para inteiro
-      String crcMessage = address_received + function_received + lengthOfData + data_received;          // Montagem da mensagem recebida
-      unsigned short crc_calculated = crc.XModemCrc((byte*)crcMessage.c_str(), 0, crcMessage.length()); // Calculo do CRC 
-      crc_check = (crc_calculated == crc_received);         // Verifica o crc recebido e o crc calculado
-      enable_program = address_received.equals(String(ADDRESS));                                        // Verifica o endereco para recepcao da mensagem
+    if (frame_received.length() > 0) {                      // Se o quadro tiver dados
+      // Divide o quadro recebido em partes (endereço, função, dados e CRC)
+      address_received = frame_received.substring(0, 1);    // Extrai o endereço
+      function_received = frame_received.substring(1, 2);   // Extrai a função
+      String lengthOfData = frame_received.substring(2, 4); // Extrai o comprimento dos dados
+      data_length = lengthOfData.toInt();                   // Converte o comprimento para inteiro
+      data_received = frame_received.substring(4, 4 + data_length);  // Extrai os dados
+      String crcReceived = frame_received.substring(4 + data_length); // Extrai o CRC recebido
+      crc_received = crcReceived.toInt();                   // Converte o CRC para inteiro
+
+      // Calcula o CRC da mensagem recebida
+      String crcMessage = address_received + function_received + lengthOfData + data_received;
+      unsigned short crc_calculated = crc.XModemCrc((byte*)crcMessage.c_str(), 0, crcMessage.length());
+
+      // Verifica se o CRC calculado é igual ao recebido
+      crc_check = (crc_calculated == crc_received);
+      enable_program = address_received.equals(String(ADDRESS));  // Habilita o programa se o endereço for válido
     }
   }
 }
 
-void comunication_mode(String mode){
-  delay(200);
-  if (mode == "SEND") {
-    digitalWrite(SR_COM, HIGH);                             // Habilita o envio de dados para a interface
+void comunication_mode(String mode) {
+  delay(200);                                               // Adiciona um pequeno atraso para sincronização
+  if (mode == "SEND") {                                     // Se o modo for envio de dados
+    digitalWrite(SR_COM, HIGH);                             // Ativa o envio de dados para a interface
+  } else if (mode == "RECEIVE") {                           // Se o modo for recepção de dados
+    digitalWrite(SR_COM, LOW);                              // Ativa a recepção de dados da interface
   }
-  else if (mode == "RECEIVE") {                             // Habilita a recepcao de dados da interface
-    digitalWrite(SR_COM, LOW);
-  }
-  delay(200);
+  delay(200);                                               // Adiciona um pequeno atraso para estabilização
 }
 
-void setPinout(void){
-  for (size_t i = 0; i < 6; i++) {
-    pinMode(pins[i], OUTPUT);                               // configuracao do pinMode  do pontos
+void setPinout(void) {
+  for (size_t i = 0; i < 6; i++) {                          // Para cada pino de controle
+    pinMode(pins[i], OUTPUT);                               // Configura como saída
   }
-  pinMode(SR_COM, OUTPUT);
-  pinMode(_LED, OUTPUT);
-} 
+  pinMode(SR_COM, OUTPUT);                                  // Configura o pino de controle de comunicação como saída
+  pinMode(_LED, OUTPUT);                                    // Configura o pino do LED indicador como saída
+}
 
-void execute_program(void){
-  // Endereco recebido == Endereco do Dispositivo
-  clearBuffer();
-  if (enable_program) {
-    
-    // CRC calculado != CRC recebido
-    if (!crc_check) {
-      comunication_mode("SEND");
-      Serial.println("CRC INCORRECT");
+void execute_program(void) {
+  clearBuffer();                                            // Limpa o buffer de entrada serial
+  if (enable_program) {                                     // Se o programa está habilitado para execução
+    if (!crc_check) {                                       // Se o CRC não é válido
+      comunication_mode("SEND");                            // Alterna para modo de envio
+      Serial.println("CRC INCORRECT");                      // Envia uma mensagem de erro
       delay(200);
-      comunication_mode("RECEIVE");
-    }
-    // CRC calculado == CRC recebido
-    else {
-
+      comunication_mode("RECEIVE");                         // Retorna ao modo de recepção
+    } else {                                                // Se o CRC é válido
+      // Verifica qual função foi recebida e chama a função correspondente
       switch (function_received.charAt(0)) {
         case CODE_TRANSLATE_MESSAGE:
           compile_translation(); 
           break;
-
         case CODE_EXECUTE_MESSAGE:
           execute_translation(); 
           break;
-
         case CODE_CHANGE_SPEED:
           change_speed(); 
           break;
-
         case CODE_CURRENT_SPEED:
           obtain_speed(); 
           break;
-
+        case CODE_CURRENT_MESSAGE:
+          obtain_message();
         default:
           break;
       }
-      function_received = "#";
+      function_received = "#";                              // Reseta a função recebida após o processamento
     }
-  }
-  else {
-    comunication_mode("SEND");
-    Serial.println("ADDRESS NOT FOUND!");                   // Retorna mensagem indicando erro de endereco para comunicaco de dados
+  } else {
+    comunication_mode("SEND");                              // Alterna para modo de envio
+    Serial.println("ADDRESS NOT FOUND!");                   // Envia mensagem de erro caso o endereço não seja encontrado
     delay(200);
-    comunication_mode("RECEIVE");
+    comunication_mode("RECEIVE");                           // Retorna ao modo de recepção
   }
-}                               
+}
 
-void clearBuffer(void){
-  while (Serial.available() > 0) {
-    Serial.read();
+void clearBuffer(void) {
+  while (Serial.available() > 0) {                          // Enquanto houver dados no buffer
+    Serial.read();                                          // Lê e descarta os dados (limpa o buffer)
   }
 }
 
 void exibe_caractere(void) {
-  
+  // Exibe o caractere traduzido nos pontos de Braille
   digitalWrite(POINT_1, output[0]);
   digitalWrite(POINT_2, output[1]);
   digitalWrite(POINT_3, output[2]);
@@ -177,70 +175,79 @@ void exibe_caractere(void) {
   digitalWrite(POINT_6, output[5]);
 }
 
-
 void compile_translation(void) {
   if (data_length > 0) {
-    comunication_mode("SEND");
-    Serial.print("Executing translation...");
-    delay(200);
-    comunication_mode("RECEIVE");
-    for (size_t i = 0; i < data_length; i++) {
-      define_caractere(data_received[i]);
-    }
-    digitalWrite(_LED, HIGH);
-    translation_ok = true;
+    comunication_mode("SEND");                             // Configura para enviar dados pela serial
+    Serial.print("Executing translation...");              // Exibe mensagem indicando execução da tradução
+    delay(200);                                            // Pequena pausa para garantir sincronização
+    comunication_mode("RECEIVE");                          // Volta a receber dados pela serial
+    data_backup = data_received;                           // Armazena a mensagem recebida para futuras execuções
   }
-  else {
-    comunication_mode("SEND");
-    Serial.println("No message found to translation...");
-    delay(200);
-    comunication_mode("RECEIVE");
-    digitalWrite(_LED, LOW);
+  else {                                                   // Caso não tenha mensagem a ser traduzida
+    comunication_mode("SEND");                             // Configura para enviar dados pela serial
+    Serial.println("No message found to translation...");  // Exibe mensagem de erro
+    delay(200);                                            // Pequena pausa para garantir sincronização
+    comunication_mode("RECEIVE");                          // Volta a receber dados pela serial
+    digitalWrite(_LED, LOW);                               // Desativa o LED de status
   }
 }
+
 void execute_translation(void) {
-  comunication_mode("SEND");
-  Serial.println("Executing program :)");
-  delay(200);
-  comunication_mode("RECEIVE");
-  reset_output();
-  exibe_caractere();
-  for (size_t i = 0; i < data_length; i++) {
-    define_caractere(data_received[i]);
-    exibe_caractere();
-    digitalWrite(_LED, HIGH);
-    delay(time_slap);
-    reset_output();
-    exibe_caractere();
-    digitalWrite(_LED, LOW);
-    delay(time_slap);
+  comunication_mode("SEND");                               // Configura para enviar dados pela serial
+  Serial.println("Executing program :)");                  // Exibe mensagem indicando início da execução do programa
+  delay(200);                                              // Pequena pausa para garantir sincronização
+  comunication_mode("RECEIVE");                            // Volta a receber dados pela serial
+  reset_output();                                          // Reseta os pinos de controle (desativa todos os pontos do caractere)
+  exibe_caractere();                                       // Exibe o caractere atual
+
+  // Percorre cada caractere armazenado na mensagem recebida
+  for (size_t i = 0; i < data_backup.length(); i++) {
+    define_caractere(data_backup[i]);                      // Define o padrão dos pontos para o caractere atual
+    exibe_caractere();                                     // Atualiza a exibição do caractere
+    digitalWrite(_LED, HIGH);                              // Ativa o LED de status durante a execução
+    delay(time_slap);                                      // Pausa entre cada caractere
+    reset_output();                                        // Reseta os pontos
+    exibe_caractere();                                     // Atualiza para não mostrar nenhum ponto ativo
+    digitalWrite(_LED, LOW);                               // Desativa o LED de status
+    delay(time_slap);                                      // Pausa antes de passar para o próximo caractere
   }
-  reset_output();
-  exibe_caractere();
-  digitalWrite(_LED, LOW);
-  translation_ok = false;
+  reset_output();                                          // Reseta todos os pontos ao final da execução
+  exibe_caractere();                                       // Atualiza para não mostrar nenhum ponto ativo
+  digitalWrite(_LED, LOW);                                 // Garante que o LED de status está desativado
+  translation_ok = false;                                  // Reseta o flag de tradução bem-sucedida
 }
 
 void change_speed(void) {
-  comunication_mode("SEND");
-  Serial.print("Change speed ... ");
-  Serial.print(time_slap);
-  Serial.print(" -->> ");
-  Serial.println(data_received);
-  delay(200);
-  comunication_mode("RECEIVE");
-  time_slap = data_received.toInt();
-  delay(1000);
+  comunication_mode("SEND");                               // Configura para enviar dados pela serial
+  Serial.print("Change speed ... ");                       // Exibe mensagem indicando alteração da velocidade
+  Serial.print(time_slap);                                 // Exibe a velocidade atual
+  Serial.print(" -->> ");                                  // Exibe seta para indicar alteração
+  Serial.println(data_received);                           // Exibe a nova velocidade recebida
+  delay(200);                                              // Pausa para garantir a sincronização
+  comunication_mode("RECEIVE");                            // Volta a receber dados pela serial
+  time_slap = data_received.toInt();                       // Converte e armazena o novo tempo de intervalo
+  delay(1000);                                             // Pausa antes de executar o próximo bloco
+
+  // Faz o LED piscar 6 vezes para indicar a mudança de velocidade
   for (size_t i = 0; i < 6; i++) {
-    digitalWrite(_LED, !digitalRead(_LED));
-    delay(500);
+    digitalWrite(_LED, !digitalRead(_LED));                // Alterna o estado do LED (pisca)
+    delay(500);                                            // Pausa entre piscadas
   }
 }
 
 void obtain_speed(void) {
-  comunication_mode("SEND");
-  Serial.print("Getting current speed: ");
-  Serial.println(time_slap);
-  delay(200);
-  comunication_mode("RECEIVE");
+  comunication_mode("SEND");                               // Configura para enviar dados pela serial
+  Serial.print("Getting current speed: ");                 // Exibe mensagem de obtenção da velocidade
+  Serial.println(time_slap);                               // Exibe a velocidade atual
+  delay(200);                                              // Pausa para garantir a sincronização
+  comunication_mode("RECEIVE");                            // Volta a receber dados pela serial
 }
+
+void obtain_message(void) {
+  comunication_mode("SEND");                               // Configura para enviar dados pela serial
+  Serial.print("Current message translated: ");            // Exibe mensagem indicando a mensagem atual traduzida
+  Serial.println(data_backup);                             // Exibe a mensagem traduzida armazenada
+  delay(200);                                              // Pausa para garantir a sincronização
+  comunication_mode("RECEIVE");                            // Volta a receber dados pela serial
+}
+

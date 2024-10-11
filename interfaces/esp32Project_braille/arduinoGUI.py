@@ -41,6 +41,7 @@ class ArduinoGUISerial(QWidget):
         _btn_connect = "Connect"
         _btn_execute = "Execute"
         _btn_clear = "Clear"
+        _btn_close_serial = "Disconnect"
         _label_serial_protocol = "Padrao Serial"
         _label_baudrate = "Baudrate"
         _label_command = "Command"
@@ -49,7 +50,7 @@ class ArduinoGUISerial(QWidget):
         _protocols = ["SERIAL_8N1", "SERIAL_8N2"]
         _baudrates = ["9600", "115200"]
         self._send_functions = ["translate", "execute prog", "change speed", ""]
-        self._request_functions = ["get speed", ""]
+        self._request_functions = ["get speed", "get message", ""]
         _label_address = "Address"
 
         """
@@ -60,6 +61,7 @@ class ArduinoGUISerial(QWidget):
         self.btn_connect = QPushButton(_btn_connect)
         self.btn_clear = QPushButton(_btn_clear)
         self.btn_execute = QPushButton(_btn_execute)
+        self.btn_close_serial = QPushButton(_btn_close_serial)
         # ListWidget
         self.port_list = QListWidget()
         self.view_pc_chat = QListWidget()
@@ -129,6 +131,7 @@ class ArduinoGUISerial(QWidget):
         self.lateral_layout.addLayout(self.serial_layout)
         self.lateral_layout.addLayout(self.baudrate_layout)
         self.lateral_layout.addWidget(self.btn_connect)
+        self.lateral_layout.addWidget(self.btn_close_serial)
         self.main_layout.addLayout(self.lateral_layout, 20)
 
         # central_layout design
@@ -181,6 +184,7 @@ class ArduinoGUISerial(QWidget):
         self.btn_connect.clicked.connect(self.create_serial)
         self.btn_execute.clicked.connect(self.execute_prog)
         self.btn_clear.clicked.connect(self.clear_chat)
+        self.btn_close_serial.clicked.connect(self.close_serial)
         self.ck_send_request.stateChanged.connect(self.update_ck_send_request)
 
     # Methods
@@ -212,6 +216,11 @@ class ArduinoGUISerial(QWidget):
             print(f"Error to create Serial COM : {e}")
             self.btn_connect.setStyleSheet("background-color: rgb(255,0,0);")
 
+    def close_serial(self):
+        if self.my_serial.serial.is_open:
+            self.my_serial.serial.close()
+            self.btn_connect.setStyleSheet("background-color: rgb(255,0,0);")
+
     def update_pc_chat(self, command):
         self.view_pc_chat.addItem(f"Request: {command}")
 
@@ -222,6 +231,8 @@ class ArduinoGUISerial(QWidget):
         send = not self.ck_send_request.isChecked()
         address = str(self.le_address.text()).strip().upper()
         func = self.cb_functions.currentText()[0].upper()
+        if str(self.cb_functions.currentText()) == "get message":
+            func = "M"
         data = self.te_translate_text.toPlainText()[:51].lower()
         if len(data) == 0:
             data = " "
