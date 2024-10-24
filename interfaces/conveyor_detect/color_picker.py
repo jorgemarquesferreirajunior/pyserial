@@ -1,34 +1,34 @@
 import cv2
 
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(2)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
 
 def get_color(hue_value):
     color = "undefined"
-    if hue_val < 7:
+    if hue_value < 7:
         color = "red"
-    elif hue_val < 19:
+    elif hue_value < 19:
         color = "orange"
-    elif hue_val < 32:
+    elif hue_value < 32:
         color = "yellow"
-    elif hue_val < 100:
+    elif hue_value < 100:
         color = "green"
-    elif hue_val < 125:
+    elif hue_value < 125:
         color = "blue"
-    elif hue_val < 136:
+    elif hue_value < 136:
         color = "violet"
-    elif hue_val < 162:
+    elif hue_value < 162:
         color = "pink"
-    elif hue_val >= 162:
+    elif hue_value >= 162:
         color = "red"
     return color.upper()
 
 
 while True:
     _, frame = cap.read()
-    frame = cv2.flip(frame, 1)
+    # frame = cv2.flip(frame, 1)
     hsv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
     height, width = frame.shape[:2]

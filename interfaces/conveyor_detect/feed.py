@@ -38,6 +38,9 @@ class MainWin(QWidget):
         # List Widgets
         self.lw_serial_list = QListWidget()
 
+        # Line Edit
+        self.le_camera_address = QLineEdit()
+
         # Labels
         self.lb_camera_runtime = QLabel()
         self.lb_camera_detection = QLabel()
@@ -57,7 +60,6 @@ class MainWin(QWidget):
         # QThreads
 
         self.worker = VideoWorker()
-        # self.worker.start()
         self.worker.image_update_runtime.connect(self.image_update_camera_runtime)
         self.worker.image_update_detection.connect(self.image_update_camera_detection)
 
@@ -97,8 +99,11 @@ class MainWin(QWidget):
         self.layout_central.addWidget(self.lb_camera_runtime)
         self.layout_central.addWidget(self.lb_camera_detection)
 
+        self.le_camera_address.setPlaceholderText("Endereco da camera ...")
+
         self.layout_header.addWidget(self.btn_video)
         self.layout_header.addWidget(self.btn_close)
+        self.layout_header.addWidget(self.le_camera_address)
         self.layout_header.addSpacerItem(self.spacer_h)
         self.layout_header.addWidget(self.lb_watch)
 
@@ -131,6 +136,11 @@ class MainWin(QWidget):
 
     def start_video(self):
         if not self.worker.isRunning():
+            print(
+                f"QLineEdit: {self.le_camera_address.text()} | Type: {type(self.le_camera_address.text())}"
+            )
+
+            self.worker.address = self.le_camera_address.text()
             self.worker.start()
 
     def stop_video(self):
@@ -185,6 +195,8 @@ class MainWin(QWidget):
     def search_ports(self):
         ports = list_ports.comports()
 
+        # [print(port) for port in ports]
+
         self.lw_serial_list.clear()
 
         [
@@ -197,21 +209,57 @@ class MainWin(QWidget):
         try:
             port = self.lw_serial_list.currentItem().text()
             self.serial_connection = MySerial(port=port)
-            if self.serial_connection.is_open:
-                self.btn_connect.setStyleSheet("background-color: (0,255,0);")
+            if self.serial_connection.ser.is_open:
+                self.btn_connect.setStyleSheet("background-color: rgb(0,255,0);")
+                self.lb_status_serial.setText("connected   ")
+
+                self.worker.connection = self.serial_connection
         except Exception as e:
             self.te_output.append(f"Error: {str(e)}")
 
     def disconnect_serial(self):
-        if self.serial_connection:
+        if self.serial_connection.ser.is_open:
             self.serial_connection.ser.close()
-            if not self.serial_connection.is_open:
-                self.btn_connect.setStyleSheet("background-color: (255,0,0);")
+
+            if not self.serial_connection.ser.is_open:
+                self.btn_connect.setStyleSheet("background-color: rgb(255,0,0);")
+        self.lb_status_serial.setText("disconnected")
 
 
 # Cores no formato BGR
 yellow = [0, 255, 255]
 blue = [255, 0, 0]
+
+color_map = {
+    "RED": 1,
+    "BLUE": 2,
+    "YELLOW": 3,
+    "GREEN": 4,
+    "ORANGE": 5,
+    "PURPLE": 6,
+    "PINK": 7,
+}
+
+
+def get_color(hue_value):
+    color = "undefined"
+    if hue_value < 7:
+        color = "red"
+    elif hue_value < 19:
+        color = "orange"
+    elif hue_value < 32:
+        color = "yellow"
+    elif hue_value < 100:
+        color = "green"
+    elif hue_value < 125:
+        color = "blue"
+    elif hue_value < 136:
+        color = "violet"
+    elif hue_value < 162:
+        color = "pink"
+    elif hue_value >= 162:
+        color = "red"
+    return color.upper()
 
 
 def get_limits(color_name):
@@ -252,19 +300,130 @@ class VideoWorker(QThread):
     image_update_runtime = pyqtSignal(QImage)
     image_update_detection = pyqtSignal(QImage)
 
-    def __init__(self):
+    def __init__(self, serial_com=None):
         super(VideoWorker, self).__init__()
         self.capture = None
         self.thread_on = False
+        self.camera_adrress = 0
+        self.serial_com = serial_com
+
+    @property
+    def address(self):
+        return self.camera_adrress
+
+    @address.setter
+    def address(self, value):
+        print(f"Funcao setter, value: {value} | tipo: {type(value)}")
+        if len(value) == 0:
+            self.camera_adrress = 0
+        elif len(value) >= 2:
+            self.camera_adrress = value
+        else:
+            self.camera_adrress = int(value)
+
+    @property
+    def connection(self):
+        return self.serial_com
+
+    @connection.setter
+    def connection(self, value):
+        self.serial_com = value
+
+    def exit_connection(self):
+        if self.serial_com:
+            self.serial_com.serial.close()
 
     def run(self):
-        self.capture = cv2.VideoCapture(0)
+        print(
+            f"Endereco da camera: {self.camera_adrress} | Tipo: {type(self.camera_adrress)}"
+        )
+        self.capture = cv2.VideoCapture(self.camera_adrress)
         self.thread_on = True
 
         while self.thread_on:
             ret, frame = self.capture.read()
-
             if ret:
+                frame = cv2.flip(frame, 1)
+                # Update runtime display
+                image_runtime = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                image_runtime = cv2.flip(image_runtime, 1)
+                image_pyqt_runtime = QImage(
+                    image_runtime.data,
+                    image_runtime.shape[1],
+                    image_runtime.shape[0],
+                    QImage.Format_RGB888,
+                )
+                pic_runtime = image_pyqt_runtime.scaled(640, 480, Qt.KeepAspectRatio)
+                self.image_update_runtime.emit(pic_runtime)
+
+                hsv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+                height, width = frame.shape[:2]
+                cx = int(width / 2)
+                cy = int(height / 2)
+                bgr_pixel_center = frame[cy, cx]
+                bgr_pixel_center = tuple(map(int, bgr_pixel_center))
+                hsv_pixel_center = hsv_frame[cy, cx]
+                hue_val = hsv_pixel_center[0]
+
+                detected_color = get_color(hue_val)
+                msg = detected_color + f" - hue: {str(hue_val)}"
+
+                if self.serial_com and self.serial_com.ser.is_open:
+                    print("Serial ok")
+                    if self.serial_com.ser.in_waiting > 0:
+                        # Ler solicitação do Arduino
+                        request = self.serial_com.ser.read().decode("utf-8")
+                        if request == "R":  # Supondo que 'R' seja a solicitação
+                            color_code = color_map.get(
+                                detected_color, 0
+                            )  # 0 para indefinido
+                            # Enviar a cor detectada como número
+                            self.serial_com.ser.write(f"{color_code}\n".encode())
+                            print(f"Recebido: {request}")
+                    # Aqui você pode processar os dados recebidos do ESP32
+                    else:
+                        # Se não houver dados, você pode continuar executando outras tarefas
+                        print("Aguardando dados do ESP32...")
+
+                    time.sleep(
+                        0.1
+                    )  # Intervalo de espera para evitar uso excessivo da CPU
+
+                # cv2.circle(frame, (cx, cy), 5, (255, 0, 0), 3)
+                offset = 100
+                cv2.rectangle(
+                    frame,
+                    (cx - offset, cy - offset),
+                    (cx + offset, cy + offset),
+                    (255, 0, 0),
+                    3,
+                )
+                frame = cv2.flip(frame, 1)
+                cv2.rectangle(frame, (50, 100), (300, 300), bgr_pixel_center, -1)
+                text_size, _ = cv2.getTextSize(msg, cv2.FONT_HERSHEY_SIMPLEX, 1, 2)
+                text_w, text_h = text_size
+                cv2.rectangle(
+                    frame, (50, 60), (50 + text_w, 60 + text_h + 10), (0, 0, 0), -1
+                )
+                cv2.putText(frame, msg, (50, 90), 0, 1, (255, 255, 255), 2)
+                # Update detection display
+                image_detection = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                # image_detection = cv2.flip(image_detection, 1)
+                image_pyqt_detection = QImage(
+                    image_detection.data,
+                    image_detection.shape[1],
+                    image_detection.shape[0],
+                    QImage.Format_RGB888,
+                )
+                pic_detection = image_pyqt_detection.scaled(
+                    640, 480, Qt.KeepAspectRatio
+                )
+                self.image_update_detection.emit(pic_detection)
+
+                """
+
+
                 # Update runtime display
                 image_runtime = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 image_runtime = cv2.flip(image_runtime, 1)
@@ -326,11 +485,15 @@ class VideoWorker(QThread):
                 )
                 self.image_update_detection.emit(pic_detection)
 
+                """
+
     def stop(self):
         self.thread_on = False
         if self.capture is not None:
             self.capture.release()
             self.capture = None
+            cv2.destroyAllWindows()
+
         self.quit()
         self.wait()
 
