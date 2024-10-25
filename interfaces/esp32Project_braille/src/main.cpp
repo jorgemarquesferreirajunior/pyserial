@@ -1,9 +1,12 @@
 #include <Arduino.h>                                        // Biblioteca padrão para uso do Arduino na IDE PlatformIO
 #include "Crc16.h"                                          // Biblioteca para cálculo de CRC16
 #include "Control.h"                                        // Biblioteca para controle dos acionamentos dos pontos 
+#include <DFRobotDFPlayerMini.h>
+
+DFRobotDFPlayerMini player;
 
 #define ADDRESS                   1                         // Endereço padrão para comunicação Interface/Dispositivo
-#define _LED                      2                         // LED indicador do dispositivo
+#define LED_BOARD                 2                         // LED indicador do dispositivo
 Crc16 crc;                                                  // Instância da classe CRC16
 
 /*
@@ -14,9 +17,12 @@ Crc16 crc;                                                  // Instância da cla
 #define POINT_1                   13                        // Pino para acionamento do ponto 1 (LED 1)
 #define POINT_2                   12                        // Pino para acionamento do ponto 2 (LED 2)
 #define POINT_3                   14                        // Pino para acionamento do ponto 3 (LED 3)
-#define POINT_4                   27                        // Pino para acionamento do ponto 4 (LED 4)
-#define POINT_5                   26                        // Pino para acionamento do ponto 5 (LED 5)
-#define POINT_6                   25                        // Pino para acionamento do ponto 6 (LED 6)
+#define POINT_4                   17                        // Pino para acionamento do ponto 4 (LED 4)
+#define POINT_5                   16                        // Pino para acionamento do ponto 5 (LED 5)
+#define POINT_6                   15                        // Pino para acionamento do ponto 6 (LED 6)
+#define PIN_MP3_TX 26                                       // Connects to module's RX 
+#define PIN_MP3_RX 27                                       // Connects to module's TX 
+
 unsigned short pins[6] = {
   POINT_1,
   POINT_2,
@@ -50,6 +56,7 @@ long time_slap =                  500;                      // Intervalo entre c
 /*
  * Declaração de escopo das funções auxiliares
  */
+void checkDFPlayer(void);
 void checkSerial(void);                                     // Função para checar recebimento de dados pela serial
 void comunication_mode(String mode);                        // Função para alternar entre modos de comunicação
 void setPinout(void);                                       // Função para configurar os pinos de saída
@@ -64,13 +71,29 @@ void obtain_message(void);                                  // Obtém a mensagem
 
 void setup() {
   Serial.begin(9600);                                       // Inicializa a comunicação serial com baudrate 9600
+  Serial1.begin(9600, SERIAL_8N1, PIN_MP3_RX, PIN_MP3_TX);
+  digitalWrite(LED_BOARD, 1);
+
   setPinout();                                              // Configura os pinos como saídas
   reset_output();                                           // Reseta o estado dos pinos
   exibe_caractere();                                        // Inicializa os pinos em estado baixo (nenhum ponto ativado)
   comunication_mode("RECEIVE");                             // Habilita a recepção de dados da interface
+  digitalWrite(LED_BOARD, 1);
+  checkDFPlayer();
 }
 
 void loop() {
+  /*
+   * Teste comunicacao serial - controle player
+  if (Serial.available() > 0) {
+    String buffer = Serial.readStringUntil('\n');
+    int buffer_length = buffer.length();
+    String data = buffer.substring(0,buffer_length);
+    int index = data.toInt();
+    player.play(index);
+    delay(200);
+  }
+  */
   comunication_mode("RECEIVE");                             // Habilita a recepção de dados continuamente
   checkSerial();                                            // Verifica se dados foram recebidos
   execute_program();                                        // Executa o programa se os dados forem válidos
@@ -118,7 +141,9 @@ void setPinout(void) {
     pinMode(pins[i], OUTPUT);                               // Configura como saída
   }
   pinMode(SR_COM, OUTPUT);                                  // Configura o pino de controle de comunicação como saída
-  pinMode(_LED, OUTPUT);                                    // Configura o pino do LED indicador como saída
+  //pinMode(TX_1, OUTPUT);                                  // Configura o pino de controle de comunicação como saída
+  //pinMode(RX_1, OUTPUT);                                  // Configura o pino de controle de comunicação como saída
+  pinMode(LED_BOARD, OUTPUT);                                    // Configura o pino do LED indicador como saída
 }
 
 void execute_program(void) {
@@ -188,7 +213,7 @@ void compile_translation(void) {
     Serial.println("No message found to translation...");  // Exibe mensagem de erro
     delay(200);                                            // Pequena pausa para garantir sincronização
     comunication_mode("RECEIVE");                          // Volta a receber dados pela serial
-    digitalWrite(_LED, LOW);                               // Desativa o LED de status
+    digitalWrite(LED_BOARD, LOW);                               // Desativa o LED de status
   }
 }
 
@@ -204,16 +229,18 @@ void execute_translation(void) {
   for (size_t i = 0; i < data_backup.length(); i++) {
     define_caractere(data_backup[i]);                      // Define o padrão dos pontos para o caractere atual
     exibe_caractere();                                     // Atualiza a exibição do caractere
-    digitalWrite(_LED, HIGH);                              // Ativa o LED de status durante a execução
+    player.play(data_backup[i] - 96);
+    digitalWrite(LED_BOARD, HIGH);                              // Ativa o LED de status durante a execução
     delay(time_slap);                                      // Pausa entre cada caractere
+    player.pause();
     reset_output();                                        // Reseta os pontos
     exibe_caractere();                                     // Atualiza para não mostrar nenhum ponto ativo
-    digitalWrite(_LED, LOW);                               // Desativa o LED de status
+    digitalWrite(LED_BOARD, LOW);                               // Desativa o LED de status
     delay(time_slap);                                      // Pausa antes de passar para o próximo caractere
   }
   reset_output();                                          // Reseta todos os pontos ao final da execução
   exibe_caractere();                                       // Atualiza para não mostrar nenhum ponto ativo
-  digitalWrite(_LED, LOW);                                 // Garante que o LED de status está desativado
+  digitalWrite(LED_BOARD, LOW);                                 // Garante que o LED de status está desativado
   translation_ok = false;                                  // Reseta o flag de tradução bem-sucedida
 }
 
@@ -230,7 +257,7 @@ void change_speed(void) {
 
   // Faz o LED piscar 6 vezes para indicar a mudança de velocidade
   for (size_t i = 0; i < 6; i++) {
-    digitalWrite(_LED, !digitalRead(_LED));                // Alterna o estado do LED (pisca)
+    digitalWrite(LED_BOARD, !digitalRead(LED_BOARD));                // Alterna o estado do LED (pisca)
     delay(500);                                            // Pausa entre piscadas
   }
 }
@@ -251,3 +278,20 @@ void obtain_message(void) {
   comunication_mode("RECEIVE");                            // Volta a receber dados pela serial
 }
 
+void checkDFPlayer(void) {
+
+  // Start communication with DFPlayer Mini
+  if (!player.begin(Serial1)) {
+    //Serial.println("Connecting to DFPlayer Mini failed!");
+    while (true);
+  } 
+  else {
+    digitalWrite(LED_BOARD, 0);
+    //Serial.println("Connection OK");
+
+    // Set volume to maximum (0 to 30).
+    player.volume(30);
+    // Play the first MP3 file on the SD card
+    player.play(1);
+  } 
+}
