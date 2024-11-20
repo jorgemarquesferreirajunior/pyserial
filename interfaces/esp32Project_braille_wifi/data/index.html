@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ESP32 Web Server</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+
+<body>
+  <h1>ESP32 Web Server</h1>
+  <p>
+    <input type="text" id="messageInput" placeholder="Digite uma nova mensagem"><br>
+    <button id="setMessageButton">Enviar</button>
+    <button id="clearMessageButton">Limpar</button>
+    <button id="getMessageButton">Buscar</button>
+  </p>
+  <p id="messageDisplay">Mensagem: </p>
+
+  <!-- Botões para manipulação do intervalo -->
+  <input type="number" id="intervalInput" value="1000" min="200" max="2000" disabled="true">
+  <button id="increaseButton">Aumentar</button>
+  <button id="decreaseButton">Diminuir</button>
+  <button id="saveButton">Salvar</button>
+
+  <p id="intervalDisplay">Intervalo: 1000 ms</p>
+
+  <script src="/script.js"></script>
+</body>
+
+</html>
