@@ -14,7 +14,7 @@ public:
     btn_liberado = btn_clicado = 0;
     pinMode(pino, INPUT); // Configura o pino como entrada
   }
-
+  bool get_state(void) { return digitalRead(pino); }
   bool press() {
     bool estado_atual = digitalRead(pino);
 

@@ -11,13 +11,14 @@
 #define PIN_MP3_TX 26    // Connects to module's RX
 #define PIN_MP3_RX 27    // Connects to module's TX
 #define PIN_START_BOX 25 // Pino para execucao da mensagem
+#define PIN_AUDIO_ON 33  // Pino para execucao da mensagem + audio
 #define LED_BOARD 2
-#define POINT_1 13 // Pino para acionamento do ponto 1 (LED 1)
-#define POINT_2 12 // Pino para acionamento do ponto 2 (LED 2)
-#define POINT_3 14 // Pino para acionamento do ponto 3 (LED 3)
+#define POINT_1 15 // Pino para acionamento do ponto 1 (LED 1)
+#define POINT_2 4  // Pino para acionamento do ponto 2 (LED 2)
+#define POINT_3 16 // Pino para acionamento do ponto 3 (LED 3)
 #define POINT_4 17 // Pino para acionamento do ponto 4 (LED 4)
-#define POINT_5 16 // Pino para acionamento do ponto 5 (LED 5)
-#define POINT_6 15 // Pino para acionamento do ponto 6 (LED 6)
+#define POINT_5 5  // Pino para acionamento do ponto 5 (LED 5)
+#define POINT_6 18 // Pino para acionamento do ponto 6 (LED 6)
 unsigned short pins[6] = {POINT_1, POINT_2, POINT_3, POINT_4,
                           POINT_5, POINT_6}; // Lista para controle dos pontos
 const char *ssid = "ESP32_AP";
@@ -34,6 +35,7 @@ IPAddress subnet(255, 255, 255, 0);
 WebServer server(80);
 
 Btn btn_play_box(PIN_START_BOX, false);
+Btn btn_play_audio(PIN_AUDIO_ON, false);
 
 // Variáveis
 int intervalo = 1000; // Valor inicial do intervalo (em milissegundos)
@@ -74,7 +76,8 @@ void loop() {
     for (int c = 0; c < savedMessage.length(); c++) {
       define_caractere(savedMessage[c]);
       showChars();
-      player.play(savedMessage[c] - 96);
+      if (btn_play_audio.get_state())
+        player.play(savedMessage[c] - 96);
       digitalWrite(LED_BOARD, HIGH); // Ativa o LED de status durante a execução
       delay(intervalo);              // Pausa entre cada caractere
       player.pause();
@@ -83,6 +86,10 @@ void loop() {
       digitalWrite(LED_BOARD, LOW); // Desativa o LED de status
       delay(intervalo); // Pausa antes de passar para o próximo caractere
     }
+    delay(intervalo); // Pausa antes de passar para o próximo caractere
+    player.play(27);
+    delay(500);
+    player.pause();
     resetOutput(); // Reseta os pontos
     showChars();   // Atualiza para não mostrar nenhum ponto ativo
     digitalWrite(LED_BOARD, LOW); // Desativa o LED de status
@@ -243,7 +250,8 @@ void beginDFPlayer(void) {
       digitalWrite(LED_BOARD, !digitalRead(LED_BOARD));
       delay(1000);
     }
-    Serial.println("Connecting to DFPlayer Mini failed after 5 seconds!");
+    if (!player.begin(Serial1))
+      Serial.println("Connecting to DFPlayer Mini failed after 5 seconds!");
   } else {
     digitalWrite(LED_BOARD, LOW);
     Serial.println("Connection OK");
@@ -251,7 +259,7 @@ void beginDFPlayer(void) {
     // Set volume to maximum (0 to 30).
     player.volume(30);
     // Play the first MP3 file on the SD card
-    player.play(1);
+    // player.play(1);
   }
 }
 
@@ -260,6 +268,7 @@ void setPinout(void) {
     pinMode(pins[i], OUTPUT);      // Configura como saída
   }
   pinMode(LED_BOARD, OUTPUT); // Configura o pino do LED indicador como saída
+  pinMode(PIN_AUDIO_ON, INPUT_PULLUP);
   pinMode(PIN_START_BOX,
           INPUT_PULLUP); // Configura o pino de execucao da mensagem como
                          // entrada de nivel logico alto
